@@ -1,71 +1,145 @@
-import './style.css'
-// import javascriptLogo from './javascript.svg'
-// import viteLogo from '/vite.svg'
-// import { setupCounter } from './counter.js'
+import "./style.css";
 
-// document.querySelector('#app').innerHTML = `
-//   <div>
-//     <a href="https://vitejs.dev" target="_blank">
-//       <img src="${viteLogo}" class="logo" alt="Vite logo" />
-//     </a>
-//     <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-//       <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
-//     </a>
-//     <h1>Hello Vite!</h1>
-//     <div class="card">
-//       <button id="counter" type="button"></button>
-//     </div>
-//     <p class="read-the-docs">
-//       Click on the Vite logo to learn more
-//     </p>
-//   </div>
-// `
+import { Engine } from "@babylonjs/core/Engines/engine.js";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import {
+  WebXRExperienceHelper,
+  WebXRBackgroundRemover,
+  WebXRState,
+  WebXREnterExitUIButton,
+  WebXRImageTracking,
+} from "@babylonjs/core/XR";
+// Required for EnvironmentHelper
+import "@babylonjs/core/Materials/Textures/Loaders";
+// Enable GLTF/GLB loader for loading controller models from WebXR Input registry
+import "@babylonjs/loaders/glTF";
 
-// setupCounter(document.querySelector('#counter'))
+// Without this next import, an error message like this occurs loading controller models:
+//  Build of NodeMaterial failed" error when loading controller model
+//  Uncaught (in promise) Build of NodeMaterial failed: input rgba from block
+//  FragmentOutput[FragmentOutputBlock] is not connected and is not optional.
+import "@babylonjs/core/Materials/Node/Blocks";
+import {
+  ArcRotateCamera,
+  SceneLoader,
+  TransformNode,
+  Scene,
+  Quaternion,
+  Axis,
+  Space,
+} from "@babylonjs/core";
 
-import { Engine } from "@babylonjs/core/Engines/engine";
-import { Scene } from "@babylonjs/core/scene";
-import { Vector3 } from "@babylonjs/core/Maths/math";
-import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
-import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
-import { Mesh } from "@babylonjs/core/Meshes/mesh";
+//defining global variables
+let xrButton = null;
+let sessionManager = null;
+let xr = null;
 
-// Side-effects only imports allowing the standard material to be used as default.
-import "@babylonjs/core/Materials/standardMaterial";
-// Side-effects only imports allowing Mesh to create default shapes (to enhance tree shaking, the construction methods on mesh are not available if the meshbuilder has not been imported).
-import "@babylonjs/core/Meshes/Builders/sphereBuilder";
-import "@babylonjs/core/Meshes/Builders/boxBuilder";
-import "@babylonjs/core/Meshes/Builders/groundBuilder";
-
+//retrieves the canvas element in which the scene will be rendered
 const canvas = document.getElementById("renderCanvas");
-const engine = new Engine(canvas);
-var scene = new Scene(engine);
 
-// This creates and positions a free camera (non-mesh)
-var camera = new FreeCamera("camera1", new Vector3(0, 5, -10), scene);
+// Creates engine and a scene
+const babylonEngine = new Engine(canvas, true);
+const scene = new Scene(babylonEngine);
 
-// This targets the camera to scene origin
-camera.setTarget(Vector3.Zero());
+// Add a basic light
+const directionalLight = new HemisphericLight(
+  "light1",
+  new Vector3(0, 2, 0),
+  scene
+);
 
-// This attaches the camera to the canvas
+const camera = new ArcRotateCamera(
+  "myCamera",
+  0,
+  Math.PI / 3,
+  10,
+  Vector3.Zero(),
+  scene
+);
+camera.setTarget(new Vector3(0, 2, 5));
 camera.attachControl(canvas, true);
 
-// This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-var light = new HemisphericLight("light1", new Vector3(0, 1, 0), scene);
+const root = new TransformNode("root", scene);
+// root.setEnabled(false);
 
-// Default intensity is 1. Let's dim the light a small amount
-light.intensity = 0.7;
+const model = await SceneLoader.ImportMeshAsync(
+  "",
+  "https://piratejc.github.io/assets/",
+  "valkyrie_mesh.glb",
+  scene
+);
+model.meshes[0].parent = root;
+root.rotationQuaternion = new Quaternion();
 
-// Our built-in 'sphere' shape. Params: name, subdivs, size, scene
-var sphere = Mesh.CreateSphere("sphere1", 16, 2, scene);
+//retrieves a XRSystem object from navigator --> if it's present that means you can use WebXR API
+const xrNavigator = navigator.xr;
 
-// Move the sphere upward 1/2 its height
-sphere.position.y = 2;
+//checks if ar is supported
+const immersiveOK = await xrNavigator?.isSessionSupported("immersive-ar");
 
-// Our built-in 'ground' shape. Params: name, width, depth, subdivs, scene
-Mesh.CreateGround("ground1", 6, 6, 2, scene);
+if (immersiveOK) {
+  try {
+    xr = await WebXRExperienceHelper.CreateAsync(scene).then(
+      console.log("ar initialized")
+    );
+  } catch (e) {
+    // no XR support
+    window.alert("failed to create ar session" + e);
+  }
+}
 
-engine.runRenderLoop(() => {
-    scene.render();
+//listen for state changes in xr state
+xr?.onStateChangedObservable.add((state) => {
+  switch (state) {
+    case WebXRState.IN_XR:
+    // XR is initialized and already submitted one frame
+    case WebXRState.ENTERING_XR:
+    // xr is being initialized, enter XR request was made
+    case WebXRState.EXITING_XR:
+    // xr exit request was made. not yet done.
+    case WebXRState.NOT_IN_XR:
+    // self explanatory - either out or not yet in XR
+  }
+  console.log(state);
 });
-console.log("Hellowordls");
+
+let btn = document.createElement("button");
+btn.className = "custom-xr-button";
+document.body.appendChild(btn);
+xrButton = new WebXREnterExitUIButton(btn, "immersive-ar", "local-floor");
+
+xrButton.element.onclick = async function () {
+  sessionManager = await xr?.enterXRAsync("immersive-ar", "local-floor");
+  return sessionManager;
+};
+
+const fm = xr?.featuresManager;
+
+fm.enableFeature(WebXRBackgroundRemover.Name, "latest");
+
+const imageTracking = fm.enableFeature(WebXRImageTracking, "latest", {
+  images: [
+    {
+      src: "https://cdn.babylonjs.com/imageTracking.png",
+      estimatedRealWorldWidth: 0.2,
+    },
+  ],
+});
+
+// console.log(`fm: ${fm.getEnabledFeatures()}`);
+
+imageTracking.onTrackedImageUpdatedObservable.add((image) => {
+  image.transformationMatrix.decompose(
+    root.scaling,
+    root.rotationQuaternion,
+    root.position
+  );
+  root.setEnabled(true);
+  root.translate(Axis.Y, 0.1, Space.LOCAL);
+});
+
+// Run render loop
+babylonEngine.runRenderLoop(() => {
+  if (scene) scene.render();
+});
