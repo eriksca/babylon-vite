@@ -9,6 +9,7 @@ import {
   WebXRState,
   WebXREnterExitUIButton,
   WebXRImageTracking,
+  WebXRHitTest,
 } from "@babylonjs/core/XR";
 // Required for EnvironmentHelper
 import "@babylonjs/core/Materials/Textures/Loaders";
@@ -28,6 +29,7 @@ import {
   Quaternion,
   Axis,
   Space,
+  CreateSphere,
 } from "@babylonjs/core";
 
 //defining global variables
@@ -59,18 +61,6 @@ const camera = new ArcRotateCamera(
 );
 camera.setTarget(new Vector3(0, 2, 5));
 camera.attachControl(canvas, true);
-
-const root = new TransformNode("root", scene);
-// root.setEnabled(false);
-
-const model = await SceneLoader.ImportMeshAsync(
-  "",
-  "https://piratejc.github.io/assets/",
-  "valkyrie_mesh.glb",
-  scene
-);
-model.meshes[0].parent = root;
-root.rotationQuaternion = new Quaternion();
 
 //retrieves a XRSystem object from navigator --> if it's present that means you can use WebXR API
 const xrNavigator = navigator.xr;
@@ -118,26 +108,30 @@ const fm = xr?.featuresManager;
 
 fm.enableFeature(WebXRBackgroundRemover.Name, "latest");
 
-const imageTracking = fm.enableFeature(WebXRImageTracking, "latest", {
-  images: [
-    {
-      src: "https://cdn.babylonjs.com/imageTracking.png",
-      estimatedRealWorldWidth: 0.2,
-    },
-  ],
-});
+const dot = CreateSphere("dot", { diameter: 0.05 }, scene);
+dot.isVisible = false;
 
+// const hitTetsOptions = {
+//   disablePermanentHitTest: false,
+//   enableTransientHitTest: true,
+//   useReferenceSpace: true,
+// };
+
+const hitTest = fm.enableFeature(WebXRHitTest.Name, "latest");
+
+hitTest.onHitTestResultObservable.add((results) => {
+  if (results.length) {
+    dot.isVisible = true;
+    results[0].transformationMatrix.decompose(
+      dot.scaling,
+      dot.rotationQuaternion,
+      dot.position
+    );
+  } else {
+    dot.isVisible = false;
+  }
+});
 // console.log(`fm: ${fm.getEnabledFeatures()}`);
-
-imageTracking.onTrackedImageUpdatedObservable.add((image) => {
-  image.transformationMatrix.decompose(
-    root.scaling,
-    root.rotationQuaternion,
-    root.position
-  );
-  root.setEnabled(true);
-  root.translate(Axis.Y, 0.1, Space.LOCAL);
-});
 
 // Run render loop
 babylonEngine.runRenderLoop(() => {
