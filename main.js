@@ -2,16 +2,22 @@ import "./style.css";
 
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
-import { ArcRotateCamera, Scene, CreateSphere } from "@babylonjs/core";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import { Vector3, Vector2 } from "@babylonjs/core/Maths/math.vector.js";
+import {
+  ArcRotateCamera,
+  Scene,
+  PolygonMeshBuilder,
+  StandardMaterial,
+  Color3,
+  Quaternion,
+} from "@babylonjs/core";
 import {
   WebXRExperienceHelper,
   WebXRBackgroundRemover,
   WebXRState,
   WebXREnterExitUIButton,
-  WebXRHitTest,
-  // Required for EnvironmentHelper
 } from "@babylonjs/core/XR";
+// Required for EnvironmentHelper
 import "@babylonjs/core/Materials/Textures/Loaders";
 // Enable GLTF/GLB loader for loading controller models from WebXR Input registry
 import "@babylonjs/loaders/glTF";
@@ -27,6 +33,7 @@ let xrButton = null;
 let sessionManager = null;
 let xr = null;
 
+const exp = await WebXRDefaultExperience.CreateAsync;
 //retrieves the canvas element in which the scene will be rendered
 const canvas = document.getElementById("renderCanvas");
 
@@ -98,28 +105,33 @@ const fm = xr?.featuresManager;
 
 fm.enableFeature(WebXRBackgroundRemover.Name, "latest");
 
-const dot = CreateSphere("dot", { diameter: 0.05 }, scene);
-dot.isVisible = false;
+const xrPlanes = fm.enableFeature(WebXRPlaneDetector.Name, "latest");
 
-// const hitTetsOptions = {
-//   disablePermanentHitTest: false,
-//   enableTransientHitTest: true,
-//   useReferenceSpace: true,
-// };
+const planes = [];
 
-const hitTest = fm.enableFeature(WebXRHitTest.Name, "latest");
+xrPlanes.onPlaneAddedObservable.add((plane) => {
+  plane.polygonDefinition.push(plane.polygonDefinition[0]);
+  var polygon_triangulation = new PolygonMeshBuilder(
+    "name",
+    plane.polygonDefinition.map((p) => new Vector2(p.x, p.z)),
+    scene
+  );
+  var polygon = polygon_triangulation.build(false, 0.01);
+  plane.mesh = polygon;
+  planes[plane.id] = plane.mesh;
+  const mat = new StandardMaterial("mat", scene);
+  mat.alpha = 0.5;
+  // pick a random color
+  mat.diffuseColor = Color3.Random();
+  polygon.createNormals();
+  plane.mesh.material = mat;
 
-hitTest.onHitTestResultObservable.add((results) => {
-  if (results.length) {
-    dot.isVisible = true;
-    results[0].transformationMatrix.decompose(
-      dot.scaling,
-      dot.rotationQuaternion,
-      dot.position
-    );
-  } else {
-    dot.isVisible = false;
-  }
+  plane.mesh.rotationQuaternion = new Quaternion();
+  plane.transformationMatrix.decompose(
+    plane.mesh.scaling,
+    plane.mesh.rotationQuaternion,
+    plane.mesh.position
+  );
 });
 // console.log(`fm: ${fm.getEnabledFeatures()}`);
 
