@@ -2,16 +2,16 @@ import "./style.css";
 
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
+import { ArcRotateCamera, Scene, CreateSphere } from "@babylonjs/core";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import {
   WebXRExperienceHelper,
   WebXRBackgroundRemover,
   WebXRState,
   WebXREnterExitUIButton,
-  WebXRImageTracking,
   WebXRHitTest,
+  // Required for EnvironmentHelper
 } from "@babylonjs/core/XR";
-// Required for EnvironmentHelper
 import "@babylonjs/core/Materials/Textures/Loaders";
 // Enable GLTF/GLB loader for loading controller models from WebXR Input registry
 import "@babylonjs/loaders/glTF";
@@ -21,16 +21,6 @@ import "@babylonjs/loaders/glTF";
 //  Uncaught (in promise) Build of NodeMaterial failed: input rgba from block
 //  FragmentOutput[FragmentOutputBlock] is not connected and is not optional.
 import "@babylonjs/core/Materials/Node/Blocks";
-import {
-  ArcRotateCamera,
-  SceneLoader,
-  TransformNode,
-  Scene,
-  Quaternion,
-  Axis,
-  Space,
-  CreateSphere,
-} from "@babylonjs/core";
 
 //defining global variables
 let xrButton = null;
