@@ -1,5 +1,5 @@
 import "./style.css";
-
+import earcut from "earcut";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { Vector3, Vector2 } from "@babylonjs/core/Maths/math.vector.js";
@@ -16,6 +16,7 @@ import {
   WebXRBackgroundRemover,
   WebXRState,
   WebXREnterExitUIButton,
+  WebXRPlaneDetector,
 } from "@babylonjs/core/XR";
 // Required for EnvironmentHelper
 import "@babylonjs/core/Materials/Textures/Loaders";
@@ -33,7 +34,6 @@ let xrButton = null;
 let sessionManager = null;
 let xr = null;
 
-const exp = await WebXRDefaultExperience.CreateAsync;
 //retrieves the canvas element in which the scene will be rendered
 const canvas = document.getElementById("renderCanvas");
 
@@ -109,12 +109,13 @@ const xrPlanes = fm.enableFeature(WebXRPlaneDetector.Name, "latest");
 
 const planes = [];
 
-xrPlanes.onPlaneAddedObservable.add((plane) => {
+xrPlanes?.onPlaneAddedObservable.add((plane) => {
   plane.polygonDefinition.push(plane.polygonDefinition[0]);
   var polygon_triangulation = new PolygonMeshBuilder(
     "name",
     plane.polygonDefinition.map((p) => new Vector2(p.x, p.z)),
-    scene
+    scene,
+    earcut
   );
   var polygon = polygon_triangulation.build(false, 0.01);
   plane.mesh = polygon;

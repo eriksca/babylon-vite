@@ -15,6 +15,7 @@
   "dependencies": {
     "@babylonjs/core": "^6.29.0",
     "@vitejs/plugin-basic-ssl": "^1.0.2",
+    "earcut": "^2.2.4",
     "webxr-polyfill": "^2.0.3"
   }
 }
