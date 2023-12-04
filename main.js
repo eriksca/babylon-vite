@@ -1,4 +1,5 @@
 import "./style.css";
+
 import earcut from "earcut";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
@@ -17,13 +18,12 @@ import {
   DirectionalLight,
 } from "@babylonjs/core";
 import {
-  WebXRExperienceHelper,
   WebXRBackgroundRemover,
   WebXRState,
-  WebXREnterExitUIButton,
   WebXRPlaneDetector,
   WebXRHitTest,
   WebXRAnchorSystem,
+  WebXRDefaultExperience,
 } from "@babylonjs/core/XR";
 // Required for EnvironmentHelper
 import "@babylonjs/core/Materials/Textures/Loaders";
@@ -37,7 +37,6 @@ import "@babylonjs/loaders/glTF";
 import "@babylonjs/core/Materials/Node/Blocks";
 
 //defining global variables
-let xrButton = null;
 let sessionManager = null;
 let xr = null;
 
@@ -71,9 +70,13 @@ const immersiveOK = await xrNavigator?.isSessionSupported("immersive-ar");
 
 if (immersiveOK) {
   try {
-    xr = await WebXRExperienceHelper.CreateAsync(scene).then(
-      console.log("ar initialized")
-    );
+    xr = await WebXRDefaultExperience.CreateAsync(scene, {
+      uiOptions: {
+        sessionMode: "immersive-ar",
+        referenceSpaceType: "local-floor",
+      },
+      optionalFeatures: true,
+    }).then(console.log("ar-initialized"));
   } catch (e) {
     // no XR support
     window.alert("failed to create ar session" + e);
@@ -81,7 +84,7 @@ if (immersiveOK) {
 }
 
 //listen for state changes in xr state
-xr?.onStateChangedObservable.add((state) => {
+xr?.baseExperience.onStateChangedObservable.add((state) => {
   switch (state) {
     case WebXRState.IN_XR:
     // XR is initialized and already submitted one frame
@@ -95,17 +98,7 @@ xr?.onStateChangedObservable.add((state) => {
   console.log(state);
 });
 
-let btn = document.createElement("button");
-btn.className = "custom-xr-button";
-document.body.appendChild(btn);
-xrButton = new WebXREnterExitUIButton(btn, "immersive-ar", "local-floor");
-
-xrButton.element.onclick = async function () {
-  sessionManager = await xr?.enterXRAsync("immersive-ar", "local-floor");
-  return sessionManager;
-};
-
-const fm = xr?.featuresManager;
+const fm = xr?.baseExperience.featuresManager;
 
 const model = await SceneLoader.ImportMeshAsync(
   "",
@@ -114,12 +107,7 @@ const model = await SceneLoader.ImportMeshAsync(
   scene
 );
 
-console.log(model);
-
-const backgroundRemover = fm.enableFeature(
-  WebXRBackgroundRemover.Name,
-  "latest"
-);
+const bgRemover = fm.enableFeature(WebXRBackgroundRemover.Name, "latest");
 const xrPlanes = fm.enableFeature(WebXRPlaneDetector.Name, "latest");
 const xrTest = fm.enableFeature(WebXRHitTest.Name, "latest");
 const anchors = fm.enableFeature(WebXRAnchorSystem.Name, "latest");
@@ -133,6 +121,7 @@ marker.isVisible = false;
 marker.rotationQuaternion = new Quaternion();
 
 var skeleton = model.skeletons[0];
+
 // ROBOT
 skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
 skeleton.animationPropertiesOverride.enableBlending = true;
@@ -140,14 +129,16 @@ skeleton.animationPropertiesOverride.blendingSpeed = 0.05;
 skeleton.animationPropertiesOverride.loopMode = 1;
 
 var idleRange = skeleton.getAnimationRange("YBot_Idle");
-var walkRange = skeleton.getAnimationRange("YBot_Walk");
-var runRange = skeleton.getAnimationRange("YBot_Run");
-var leftRange = skeleton.getAnimationRange("YBot_LeftStrafeWalk");
-var rightRange = skeleton.getAnimationRange("YBot_RightStrafeWalk");
+// var walkRange = skeleton.getAnimationRange("YBot_Walk");
+// var runRange = skeleton.getAnimationRange("YBot_Run");
+// var leftRange = skeleton.getAnimationRange("YBot_LeftStrafeWalk");
+// var rightRange = skeleton.getAnimationRange("YBot_RightStrafeWalk");
 scene.beginAnimation(skeleton, idleRange.from, idleRange.to, true);
 
 let hitTest;
+
 b.isVisible = false;
+
 xrTest.onHitTestResultObservable.add((results) => {
   if (results.length) {
     marker.isVisible = true;
@@ -167,6 +158,7 @@ xrTest.onHitTestResultObservable.add((results) => {
     hitTest = undefined;
   }
 });
+
 const mat1 = new StandardMaterial("1", scene);
 mat1.diffuseColor = Color3.Red();
 const mat2 = new StandardMaterial("1", scene);
@@ -199,7 +191,8 @@ if (anchors) {
 }
 
 scene.onPointerDown = (evt, pickInfo) => {
-  if (hitTest && anchors && xr.state === WebXRState.IN_XR) {
+  // console.log(`anchors: ${anchors}, hitTest: ${hitTest}, state: ${xr.state}`);
+  if (hitTest && anchors && xr.baseExperience.state === WebXRState.IN_XR) {
     anchors.addAnchorPointUsingHitTestResultAsync(hitTest);
   }
 };
@@ -215,14 +208,12 @@ xrPlanes.onPlaneAddedObservable.add((plane) => {
     earcut
   );
   var polygon = polygon_triangulation.build(false, 0.01);
-  plane.mesh = polygon; //BABYLON.TubeBuilder.CreateTube("tube", { path: plane.polygonDefinition, radius: 0.02, sideOrientation: BABYLON.Mesh.FRONTSIDE, updatable: true }, scene);
-  //}
+  plane.mesh = polygon;
   planes[plane.id] = plane.mesh;
   const mat = new StandardMaterial("mat", scene);
   mat.alpha = 0.5;
   mat.diffuseColor = Color3.Random();
   polygon.createNormals();
-  // polygon.receiveShadows = true;
   plane.mesh.material = mat;
 
   plane.mesh.rotationQuaternion = new Quaternion();
@@ -252,8 +243,7 @@ xrPlanes.onPlaneUpdatedObservable.add((plane) => {
   );
   var polygon = polygon_triangulation.build(false, 0.01);
   polygon.createNormals();
-  plane.mesh = polygon; // BABYLON.TubeBuilder.CreateTube("tube", { path: plane.polygonDefinition, radius: 0.02, sideOrientation: BABYLON.Mesh.FRONTSIDE, updatable: true }, scene);
-  //}
+  plane.mesh = polygon;
   planes[plane.id] = plane.mesh;
   plane.mesh.material = mat;
   plane.mesh.rotationQuaternion = new Quaternion();
