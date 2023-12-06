@@ -64,8 +64,8 @@ ground.receiveShadows = true;
 
 const model = await SceneLoader.ImportMeshAsync(
   "",
-  "./scenes/",
-  "avatar.glb",
+  "https://models.readyplayer.me/656e031368e620681db572c9.glb",
+  "",
   scene
 );
 
